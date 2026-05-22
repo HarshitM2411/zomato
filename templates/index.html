@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Restaurant Recommender</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>Restaurant Recommender</h1>
+      <p>Enter your preferences to get AI-ranked recommendations from the Zomato dataset.</p>
+    </header>
+
+    <section class="panel form-panel">
+      <form action="/recommend" method="post">
+        <label>
+          Location <span class="required">*</span>
+          <input type="text" name="location" value="{{ form.location }}" placeholder="e.g. Bangalore" required />
+        </label>
+
+        <label>
+          Budget
+          <select name="budget">
+            <option value="low" {% if form.budget == 'low' %}selected{% endif %}>Low (up to Rs. 300)</option>
+            <option value="medium" {% if form.budget == 'medium' %}selected{% endif %}>Medium (Rs. 301–700)</option>
+            <option value="high" {% if form.budget == 'high' %}selected{% endif %}>High (above Rs. 700)</option>
+          </select>
+        </label>
+
+        <label>
+          Cuisine
+          <input type="text" name="cuisine" value="{{ form.cuisine }}" placeholder="e.g. Italian (leave blank for any)" />
+        </label>
+
+        <label>
+          Minimum rating
+          <input type="number" name="min_rating" value="{{ form.min_rating }}" min="0" max="5" step="0.1" />
+        </label>
+
+        <label>
+          Extra preferences
+          <textarea name="extra_preferences" rows="2" placeholder="e.g. family-friendly, outdoor seating">{{ form.extra_preferences }}</textarea>
+        </label>
+
+        <button type="submit">Get Recommendations</button>
+      </form>
+    </section>
+
+    {% if error %}
+    <section class="panel error-panel">
+      <p>{{ error }}</p>
+    </section>
+    {% endif %}
+
+    {% if status %}
+    <section class="panel status-panel">
+      <p>{{ status }}</p>
+    </section>
+    {% endif %}
+
+    {% if results_html %}
+    <section class="panel results-panel">
+      <h2>Recommendations</h2>
+      <div class="results">{{ results_html | safe }}</div>
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>
