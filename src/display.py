@@ -2,6 +2,8 @@
 
 import html
 
+from src.ui import render_recommendations_list, render_unavailable_recommendations
+
 EMPTY_MESSAGE = (
     "No recommendations could be generated. Try broadening your preferences."
 )
@@ -30,10 +32,26 @@ def display_recommendations(recommendations: list[dict]) -> None:
         print(f"\n  Why this? : {explanation}")
 
 
-def format_recommendations_html(recommendations: list[dict]) -> str:
-    """Render recommendations as HTML for the web frontend."""
+def format_recommendations_html(
+    recommendations: list[dict],
+    candidate_count: int | None = None,
+) -> str:
+    """Render recommendations as HTML (Stitch design)."""
     if not recommendations:
-        return f'<p class="empty-message">{EMPTY_MESSAGE}</p>'
+        return render_unavailable_recommendations(EMPTY_MESSAGE)
+
+    count = candidate_count if candidate_count is not None else len(recommendations)
+    from src.ui import render_status_banner
+
+    return render_status_banner(count, len(recommendations)) + render_recommendations_list(
+        recommendations
+    )
+
+
+def format_legacy_cards(recommendations: list[dict]) -> str:
+    """Simple card HTML fallback."""
+    if not recommendations:
+        return f'<p class="empty-message">{html.escape(EMPTY_MESSAGE)}</p>'
 
     cards = []
     for item in recommendations:
@@ -62,47 +80,3 @@ def format_recommendations_html(recommendations: list[dict]) -> str:
         )
 
     return "\n".join(cards)
-
-
-if __name__ == "__main__":
-    import sys
-
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
-
-    mock = [
-        {
-            "rank": 1,
-            "name": "Truffles",
-            "cuisine": "Italian",
-            "rating": 4.5,
-            "cost_for_two": 600,
-            "explanation": "Excellent Italian with high ratings.",
-        },
-        {
-            "rank": 2,
-            "name": "Megha Upahar",
-            "cuisine": "South Indian",
-            "rating": 4.2,
-            "cost_for_two": 450,
-            "explanation": "Great value South Indian food.",
-        },
-        {
-            "rank": 3,
-            "name": "Pizza Hut",
-            "cuisine": "Pizza",
-            "rating": 3.8,
-            "cost_for_two": 500,
-            "explanation": "Reliable pizza option for groups.",
-        },
-    ]
-
-    print("=== Populated list ===")
-    display_recommendations(mock)
-
-    print("\n=== Empty list ===")
-    display_recommendations([])
-
-    html = format_recommendations_html(mock)
-    assert "Truffles" in html and "card" in html
-    print("\nAll display verification checks passed.")

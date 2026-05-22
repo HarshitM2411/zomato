@@ -10,6 +10,19 @@ from src.filter import filter_restaurants
 from src.ingest import load_zomato_dataset
 from src.llm_client import get_recommendations
 from src.prompt_builder import NO_RESTAURANTS_MESSAGE, build_prompt
+from src.ui import (
+    load_css,
+    render_footer,
+    render_gallery,
+    render_generic_error,
+    render_header,
+    render_hero,
+    render_no_results,
+    render_recommendations_list,
+    render_status_banner,
+    render_unavailable_recommendations,
+    render_validation_error,
+)
 
 BUDGET_OPTIONS = ("low", "medium", "high")
 BUDGET_LABELS = {
@@ -36,28 +49,26 @@ def load_secrets() -> None:
         pass
 
 
+def inject_styles() -> None:
+    st.markdown(f"<style>{load_css()}</style>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <style>
+        header[data-testid="stHeader"] { background: transparent; }
+        .stApp > header { display: none; }
+        #MainMenu { visibility: hidden; }
+        footer { visibility: hidden; }
+        .block-container { padding-top: 1rem; max-width: 960px; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 @st.cache_data(show_spinner="Loading restaurant dataset…")
 def get_dataset():
     """Load and cache the Zomato dataset."""
     return load_zomato_dataset()
-
-
-def render_recommendations(recommendations: list[dict]) -> None:
-    """Display recommendation cards in Streamlit."""
-    if not recommendations:
-        st.warning(EMPTY_MESSAGE)
-        return
-
-    for item in recommendations:
-        rank = item.get("rank", "?")
-        name = item.get("name", "Unknown")
-        with st.container(border=True):
-            st.subheader(f"#{rank}  {name}")
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Cuisine", item.get("cuisine", "N/A"))
-            col2.metric("Rating", f"{item.get('rating', 'N/A')} / 5")
-            col3.metric("Cost for two", f"Rs. {item.get('cost_for_two', 'N/A')}")
-            st.markdown(f"**Why this?** {item.get('explanation', '')}")
 
 
 def run_pipeline(
@@ -66,8 +77,8 @@ def run_pipeline(
     cuisine: str,
     min_rating: float,
     extra_preferences: str,
-) -> None:
-    """Execute filter → prompt → LLM → display."""
+) -> tuple[str | None, int, int]:
+    """Execute pipeline; return (error_html, candidate_count, recommendation_count)."""
     with st.spinner("Finding matching restaurants…"):
         data = get_dataset()
         candidates = filter_restaurants(
@@ -89,20 +100,21 @@ def run_pipeline(
         )
 
         if prompt.strip() == NO_RESTAURANTS_MESSAGE:
-            st.info(NO_RESTAURANTS_MESSAGE)
-            return
+            return (
+                render_no_results(location, cuisine, NO_RESTAURANTS_MESSAGE),
+                0,
+                0,
+            )
 
     with st.spinner("Getting AI recommendations from Groq…"):
         recommendations = get_recommendations(prompt)
 
     if recommendations:
-        st.success(
-            f"Found {len(candidates)} candidate(s); "
-            f"showing {len(recommendations)} recommendation(s)."
-        )
-        render_recommendations(recommendations)
-    else:
-        st.warning(EMPTY_MESSAGE)
+        html = render_status_banner(len(candidates), len(recommendations))
+        html += render_recommendations_list(recommendations)
+        return html, len(candidates), len(recommendations)
+
+    return render_unavailable_recommendations(EMPTY_MESSAGE), len(candidates), 0
 
 
 def main() -> None:
@@ -112,53 +124,89 @@ def main() -> None:
         page_title="Restaurant Recommender",
         page_icon="🍽️",
         layout="wide",
+        initial_sidebar_state="collapsed",
     )
 
-    st.title("Restaurant Recommender")
-    st.caption(
-        "Enter your preferences to get AI-ranked recommendations from the Zomato dataset."
-    )
+    inject_styles()
 
-    with st.form("preferences"):
+    st.markdown(
+        '<div class="app-shell">',
+        unsafe_allow_html=True,
+    )
+    st.markdown(render_header(), unsafe_allow_html=True)
+    st.markdown(render_hero(), unsafe_allow_html=True)
+
+    if "results_html" not in st.session_state:
+        st.session_state.results_html = None
+    if "alert_html" not in st.session_state:
+        st.session_state.alert_html = None
+
+    with st.form("preferences", border=False):
+        st.markdown('<div class="form-card" style="box-shadow:none;padding:0">', unsafe_allow_html=True)
         location = st.text_input("Location *", placeholder="e.g. Bangalore")
-        budget = st.selectbox(
-            "Budget",
-            options=BUDGET_OPTIONS,
-            format_func=lambda b: BUDGET_LABELS[b],
-            index=1,
-        )
-        cuisine = st.text_input(
-            "Cuisine",
-            placeholder="e.g. Italian (leave blank for any)",
-        )
-        min_rating = st.slider("Minimum rating", 0.0, 5.0, 3.5, 0.1)
+        col1, col2 = st.columns(2)
+        with col1:
+            budget = st.selectbox(
+                "Budget",
+                options=BUDGET_OPTIONS,
+                format_func=lambda b: BUDGET_LABELS[b],
+                index=1,
+            )
+        with col2:
+            cuisine = st.text_input(
+                "Cuisine",
+                placeholder="e.g. Italian (leave blank for any)",
+            )
+        min_rating = st.slider("Minimum Rating", 0.0, 5.0, 3.5, 0.1)
+        st.caption("Scale: 0.0 · 2.5 · 5.0")
         extra_preferences = st.text_area(
-            "Extra preferences",
-            placeholder="e.g. family-friendly, outdoor seating",
+            "Extra Preferences",
+            placeholder="e.g. family-friendly, outdoor seating, pet-friendly, live music",
         )
-        submitted = st.form_submit_button("Get Recommendations", type="primary")
+        submitted = st.form_submit_button("✨ Get Recommendations", type="primary", use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
     if submitted:
-        location = location.strip()
-        cuisine = cuisine.strip()
-        extra_preferences = extra_preferences.strip()
+        location = (location or "").strip()
+        cuisine = (cuisine or "").strip()
+        extra_preferences = (extra_preferences or "").strip()
+        st.session_state.alert_html = None
+        st.session_state.results_html = None
 
         if not location:
-            st.error("Location is required.")
-            return
+            st.session_state.alert_html = render_validation_error()
+        else:
+            try:
+                results_html, _, _ = run_pipeline(
+                    location=location,
+                    budget=budget,
+                    cuisine=cuisine,
+                    min_rating=min_rating,
+                    extra_preferences=extra_preferences,
+                )
+                st.session_state.results_html = results_html
+            except EnvironmentError as exc:
+                st.session_state.results_html = render_generic_error(str(exc))
+            except Exception:
+                st.session_state.results_html = render_generic_error(
+                    "We're having trouble connecting to our servers. "
+                    "This might be a temporary issue."
+                )
 
-        try:
-            run_pipeline(
-                location=location,
-                budget=budget,
-                cuisine=cuisine,
-                min_rating=min_rating,
-                extra_preferences=extra_preferences,
-            )
-        except EnvironmentError as exc:
-            st.error(str(exc))
-        except Exception as exc:
-            st.error(f"Something went wrong: {exc}")
+        st.rerun()
+
+    if st.session_state.alert_html:
+        st.markdown(st.session_state.alert_html, unsafe_allow_html=True)
+
+    if st.session_state.results_html:
+        st.markdown(
+            f'<section class="results-section">{st.session_state.results_html}</section>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(render_gallery(), unsafe_allow_html=True)
+    st.markdown(render_footer(), unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 main()

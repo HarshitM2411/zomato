@@ -4,68 +4,105 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Restaurant Recommender</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}" />
 </head>
 <body>
-  <main class="container">
-    <header>
-      <h1>Restaurant Recommender</h1>
-      <p>Enter your preferences to get AI-ranked recommendations from the Zomato dataset.</p>
+  <div class="app-shell">
+    <header class="site-header">
+      <a class="brand" href="/">
+        <span class="brand-icon">🍴</span>
+        Restaurant Recommender
+      </a>
+      <nav class="nav-links">
+        <a class="active" href="/">Discover</a>
+        <a href="#">Saved</a>
+      </nav>
+      <div class="nav-icons">
+        <span aria-hidden="true">🔔</span>
+        <span class="nav-avatar" aria-hidden="true"></span>
+      </div>
     </header>
 
-    <section class="panel form-panel">
+    <section class="hero">
+      <h1>Discover Your Next Favorite Meal</h1>
+      <p>Get AI-ranked recommendations from the Zomato dataset based on your preferences.</p>
+    </section>
+
+    {% if alert_html %}
+    {{ alert_html | safe }}
+    {% endif %}
+
+    <section class="form-card">
       <form action="/recommend" method="post">
-        <label>
-          Location <span class="required">*</span>
+        <div class="form-group">
+          <label>Location <span class="required">*</span></label>
           <input type="text" name="location" value="{{ form.location }}" placeholder="e.g. Bangalore" required />
-        </label>
+        </div>
 
-        <label>
-          Budget
-          <select name="budget">
-            <option value="low" {% if form.budget == 'low' %}selected{% endif %}>Low (up to Rs. 300)</option>
-            <option value="medium" {% if form.budget == 'medium' %}selected{% endif %}>Medium (Rs. 301–700)</option>
-            <option value="high" {% if form.budget == 'high' %}selected{% endif %}>High (above Rs. 700)</option>
-          </select>
-        </label>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Budget</label>
+            <select name="budget">
+              <option value="low" {% if form.budget == 'low' %}selected{% endif %}>Low (up to Rs. 300)</option>
+              <option value="medium" {% if form.budget == 'medium' %}selected{% endif %}>Medium (Rs. 301–700)</option>
+              <option value="high" {% if form.budget == 'high' %}selected{% endif %}>High (above Rs. 700)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Cuisine</label>
+            <input type="text" name="cuisine" value="{{ form.cuisine }}" placeholder="e.g. Italian (leave blank for any)" />
+          </div>
+        </div>
 
-        <label>
-          Cuisine
-          <input type="text" name="cuisine" value="{{ form.cuisine }}" placeholder="e.g. Italian (leave blank for any)" />
-        </label>
+        <div class="form-group">
+          <div class="slider-header">
+            <label>Minimum Rating</label>
+            <span class="slider-value" id="rating-value">{{ form.min_rating }}</span>
+          </div>
+          <input type="range" name="min_rating" min="0" max="5" step="0.1" value="{{ form.min_rating }}"
+                 oninput="document.getElementById('rating-value').textContent = this.value" />
+          <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#6b7280;margin-top:0.25rem">
+            <span>0.0</span><span>2.5</span><span>5.0</span>
+          </div>
+        </div>
 
-        <label>
-          Minimum rating
-          <input type="number" name="min_rating" value="{{ form.min_rating }}" min="0" max="5" step="0.1" />
-        </label>
+        <div class="form-group">
+          <label>Extra Preferences</label>
+          <textarea name="extra_preferences" rows="3" placeholder="e.g. family-friendly, outdoor seating, pet-friendly, live music">{{ form.extra_preferences }}</textarea>
+        </div>
 
-        <label>
-          Extra preferences
-          <textarea name="extra_preferences" rows="2" placeholder="e.g. family-friendly, outdoor seating">{{ form.extra_preferences }}</textarea>
-        </label>
-
-        <button type="submit">Get Recommendations</button>
+        <button type="submit" class="btn-primary">✨ Get Recommendations</button>
       </form>
     </section>
 
-    {% if error %}
-    <section class="panel error-panel">
-      <p>{{ error }}</p>
-    </section>
-    {% endif %}
-
-    {% if status %}
-    <section class="panel status-panel">
-      <p>{{ status }}</p>
-    </section>
-    {% endif %}
-
     {% if results_html %}
-    <section class="panel results-panel">
-      <h2>Recommendations</h2>
-      <div class="results">{{ results_html | safe }}</div>
+    <section class="results-section">
+      {{ results_html | safe }}
     </section>
     {% endif %}
-  </main>
+
+    <div class="gallery">
+      <img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=400&fit=crop" alt="Restaurant" loading="lazy" />
+      <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop" alt="Dining" loading="lazy" />
+      <img src="https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400&h=400&fit=crop" alt="Food" loading="lazy" />
+      <img src="https://images.unsplash.com/photo-1550966841-190eda8ff6e8?w=400&h=400&fit=crop" alt="Table setting" loading="lazy" />
+    </div>
+
+    <footer class="site-footer">
+      <div>
+        <span class="footer-brand">Restaurant Recommender</span>
+        <span> · Powered by Zomato data &amp; Groq AI</span>
+      </div>
+      <div class="footer-links">
+        <a href="#">Privacy Policy</a>
+        <a href="#">Terms of Service</a>
+        <a href="#">Contact Support</a>
+      </div>
+      <div>© 2024 Restaurant Recommender</div>
+    </footer>
+  </div>
 </body>
 </html>
