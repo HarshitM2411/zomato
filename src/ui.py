@@ -229,3 +229,45 @@ def wrap_page(content: str, active: str = "discover") -> str:
         + render_gallery()
         + render_footer()
     )
+
+
+def wrap_html_document(fragment: str) -> str:
+    """Wrap HTML fragment with styles for Streamlit rendering."""
+    return f"""
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>{load_css()}</style>
+    <div class="st-html-root">{fragment}</div>
+    """
+
+
+def estimate_html_height(fragment: str, card_count: int = 0) -> int:
+    """Estimate iframe height for Streamlit HTML blocks."""
+    if card_count > 0:
+        return min(320 * card_count + 200, 2400)
+    if "rec-card" in fragment:
+        return min(320 * fragment.count("rec-card") + 200, 2400)
+    if "empty-card" in fragment or "error-card" in fragment:
+        return 420
+    if "alert-panel" in fragment:
+        return 120
+    if "status-banner" in fragment:
+        return 80
+    return 400
+
+
+def display_st_html(fragment: str, height: int | None = None) -> None:
+    """Render HTML with CSS in Streamlit (avoids markdown escaping)."""
+    import streamlit as st
+    import streamlit.components.v1 as components
+
+    document = wrap_html_document(fragment)
+    block_height = height or estimate_html_height(fragment)
+
+    # st.html (Streamlit >= 1.28) renders real HTML; st.markdown strips complex tags.
+    if hasattr(st, "html"):
+        st.html(document, width="stretch")
+        return
+
+    components.html(document, height=block_height, scrolling=True)
